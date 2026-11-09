@@ -17,6 +17,21 @@ returned to the primary. Sessions share the working directory; this is context
 separation, not filesystem or tool isolation. Cache savings are provider-dependent,
 not a correctness guarantee.
 
+For native OpenAI Responses requests in assistant mode, `before_provider_request`
+replaces an existing `prompt_cache_key` with a stable, bounded hash scoped to the
+primary file path, provider, and outgoing model ID. Pi session IDs, connection
+identity, retention settings, and primary requests remain untouched. Other
+providers/APIs and requests without a cache key are left alone.
+
+For `gpt-6-luna` only, an experimental explicit breakpoint marks the last eligible
+inherited user `input_text` block before the persisted stint boundary. Input text is
+unchanged and implicit caching remains enabled. Missing/ambiguous boundaries,
+missing eligible text, explicit-only mode, or existing breakpoints skip annotation.
+The annotation changes only the outgoing payload, never stored session history.
+A live three-stint Luna sequence confirmed provider acceptance and substantial
+cross-stint reuse on both warm requests; see the test notes for measurements.
+Cache keys and breakpoints do not guarantee hits under other conditions.
+
 ## Opening an assistant
 
 1. Wait for the agent to be idle and require an existing primary session file.
@@ -116,6 +131,8 @@ re-read relevant files. Hashing large repositories can be expensive.
 | `assistant-session.ts` | Command and lifecycle registration |
 | `lib/sessions.ts` | Session preparation, switching, and flow-back |
 | `lib/context.ts` | Effective context copying and stint projection |
+| `lib/cache.ts` | Stable assistant-only OpenAI request cache keys |
+| `lib/cache-debug.ts` | Opt-in payload fingerprints without message text |
 | `lib/models.ts`, `lib/config.ts` | Model selection, restoration, status, preference |
 | `lib/summary.ts` | Isolated generation, approval, and manual fallback |
 | `lib/files.ts` | Content snapshots and qualified reports |

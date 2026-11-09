@@ -1,8 +1,6 @@
 # Development and verification
 
-Run commands from the project root.
-
-## Automated checks
+Run commands from the project root:
 
 ```bash
 npm install
@@ -10,8 +8,7 @@ npm run typecheck
 npm test
 ```
 
-To run tests against an existing Pi installation without installing dependencies
-in this project:
+To run tests against an existing Pi installation without installing dependencies:
 
 ```bash
 PI_PACKAGE_ROOT=/path/to/node_modules/@earendil-works/pi-coding-agent npm test
@@ -20,35 +17,82 @@ PI_PACKAGE_ROOT=/path/to/node_modules/@earendil-works/pi-coding-agent npm test
 `PI_PACKAGE_ROOT` overrides test package resolution only. Normal typechecking uses
 local development dependencies.
 
-Tests use real Pi session managers and SDK sessions with a local test provider;
-provider responses are mocked, with no provider requests or real credentials.
-Coverage includes context projection, compaction/stint scoping, model activation,
-summary approval, cancellation, and file reporting. Loading tests exercise both
-the source package and a copied installation, ensuring helpers are not registered
-as extensions.
+## Automated coverage
 
-## Verification status
+The 37 tests use real Pi session managers/SDK sessions and mocked provider responses;
+no provider requests or real credentials are used. Coverage includes:
 
-- After the copy-time cost fix, all 23 automated tests and strict typechecking
-  against Pi 1.5.0 passed. Cost regressions cover inherited assistant/tool costs,
-  preserved content/tokens, unchanged primary data, persisted zero costs, and new
-  assistant charges. The footer itself has not yet been verified live.
-- Live round trips, including after the refactor using `-e`, confirmed phrase
-  forwarding, session IDs, model attribution, and unavailable-Git coverage warnings.
-- A subsequent round trip recalled the primary fact “42 is the answer.” This is
-  consistent with context inheritance after primary compaction, but the session
-  file has not been inspected to confirm that compaction actually occurred.
+- Context projection, edits/omissions, branch findings, and compaction/stint scope.
+- Model restoration, summary approval/fallback, and cancelled switches.
+- Content-aware Git reporting and unavailable/partial coverage.
+- Source-package and copied-installation loading.
+- Inherited cost removal without changing primary data or token metadata.
+- Stable cache keys, Luna breakpoint placement, unchanged text/retention/session IDs.
+- Opt-in fingerprint privacy, prefix comparison, permissions, and failure isolation.
 
-The separate summary-generation request is not currently recorded in session usage
-entries, so its cost is absent from totals. Recording that usage is a separate
-accounting follow-up, not part of the inherited-cost fix.
+All 37 tests and strict typechecking against installed Pi 1.5.0 passed after the
+breakpoint implementation. These automated checks do not prove provider cache hits.
 
-## Remaining live checks
+## Live verification
 
-- Verify strict summary scoping with distinct primary-only and assistant-only facts.
-  One summary described inherited testing instructions; wording alone does not
-  establish a leak. Inspect the stint transcript and summary input if it recurs.
-- Verify compaction inside an assistant stint, including a boundary removed from
-  visible context, and context-edit fidelity.
-- Exercise cancellation and Git-based reporting, including already-dirty files and
-  edits committed during the stint. These paths have automated regression coverage.
+Live round trips confirmed forwarding, session/model attribution, and file coverage
+reports both outside Git and in a repository with no detected changes.
+
+Before explicit breakpoints, fresh assistant stints repeatedly read only 3,260 cached
+tokens. Fingerprints confirmed equal keys/settings and a large shared input prefix.
+Comparisons against the primary's saved fork leaves found the copied projected
+context and LLM conversion intact, excluding expected metadata differences.
+
+After adding the Luna inherited-context breakpoint, three fresh stints reported:
+
+| Stint | Cache read | Cache write | Recorded cost (USD) |
+| --- | ---: | ---: | ---: |
+| First, warming | 3,260 | 144,487 | $0.018116275 |
+| Second | 138,258 | 9,610 | $0.002626630 |
+| Third | 147,824 | 3,040 | $0.001900040 |
+
+All completed normally with the same cache key/model/settings and annotated input
+blocks. The two warm stints reused about 93.5% and 98% of input. This demonstrates
+reuse in this sequence, not guaranteed savings for other prompts, models, or gaps.
+Costs are Pi's catalog estimates, not provider-confirmed invoice amounts.
+
+## Cache fingerprint diagnostics
+
+Opt in when launching Pi:
+
+```bash
+PI_ASSISTANT_CACHE_DEBUG=1 pi -e ./assistant-session.ts
+```
+
+Resume the same primary, then run two new Luna stints with one short question each,
+returning without generated summaries. Keep tools/reasoning settings stable and
+avoid compaction. Compare first-response usage in the session files, not cumulative
+footer tokens (which include inherited token metadata).
+
+JSON-line logs append to `<assistant-session-file>.cache-debug.log` beside Pi
+session files. Restart without the environment variable to disable logging; remove
+sidecars manually when no longer needed. No extra model requests are made.
+
+Records contain session ID/time, model/cache key, JSON field/item hashes and sizes,
+annotated `breakpointBlocks`, and cumulative input-prefix hashes every 4 KiB.
+Compare keys/settings first, then the first differing item/field/prefix block.
+Offsets are bytes, not provider tokens. No message text, tool arguments, or raw
+payloads are logged; hashes still reveal equality and can permit value guessing.
+
+Logging captures our hook after rewriting, not later handlers or OpenAI's hidden
+rendered context. Sidecars use mode 0600 and refuse symlinks. Failures warn without
+aborting the request. The breakpoint is Luna-only and skips missing/ambiguous
+boundaries, missing eligible text, explicit-only mode, or existing breakpoints.
+
+## Remaining checks and limitations
+
+- Separate summary-generation usage is not persisted in session totals. Recording
+  it remains an accounting follow-up; current totals exclude that request.
+- Verify strict live summary scoping with distinct primary-only/assistant-only facts.
+  Repeated inherited facts alone do not prove a leak; inspect actual summary input.
+- Verify live compaction inside an assistant stint, including a boundary removed
+  from visible context, and context-edit fidelity. Primary-fact recall after a
+  reported compaction succeeded, but the compaction entry was not inspected.
+- Exercise live cancellation and Git reports for already-dirty and committed edits.
+- Test cache reuse after compaction, longer idle gaps, and other prompt/tool changes.
+  Other models have not been validated for the explicit breakpoint.
