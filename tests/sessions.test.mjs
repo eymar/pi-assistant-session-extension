@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { pi, user } from './support/runtime.mjs';
 import { host } from './support/host.mjs';
+import { assistantMessage } from './support/messages.mjs';
 
 test('assistant activation restores the actual model and leaves primary bytes unchanged', async () => {
   const h = await host();
@@ -12,6 +13,24 @@ test('assistant activation restores the actual model and leaves primary bytes un
     assert.equal(readFileSync(h.primaryPath, 'utf8'), h.primaryBytes);
     assert.equal(h.session.sessionManager.getHeader().parentSession, h.primaryPath);
     assert.match(JSON.stringify(h.session.messages), /Assistant stint begins/);
+  } finally { h.close(); }
+});
+
+test('assistant cost starts at zero, persists, and counts only newly appended usage', async () => {
+  const h = await host();
+  try {
+    h.session.sessionManager.appendMessage(assistantMessage());
+    const primaryBefore = readFileSync(h.primaryPath, 'utf8');
+    assert.equal(h.session.getSessionStats().cost, 0.5);
+    await h.run('assistant');
+    assert.equal(h.session.getSessionStats().cost, 0);
+    const sm = h.session.sessionManager;
+    const reopened = pi.SessionManager.open(sm.getSessionFile());
+    assert.equal(reopened.getEntries().find((entry) =>
+      entry.type === 'message' && entry.message.role === 'assistant').message.usage.cost.total, 0);
+    sm.appendMessage(assistantMessage());
+    assert.equal(h.session.getSessionStats().cost, 0.5);
+    assert.equal(readFileSync(h.primaryPath, 'utf8'), primaryBefore);
   } finally { h.close(); }
 });
 

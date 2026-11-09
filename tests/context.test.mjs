@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { pi, home, user, loadModule } from './support/runtime.mjs';
+import { assistantMessage, billedUsage } from './support/messages.mjs';
 const extension = await loadModule('lib/context.ts');
 const clean = (messages) => messages.map(({ timestamp, fromId, ...message }) => message);
 function assertProjectionCopy(source) {
@@ -49,6 +50,38 @@ test('projection respects ordinary message edits and excludes abandoned branches
   source.appendContextEdit(id, { content: 'replacement' });
   const target = assertProjectionCopy(source);
   assert.equal(target.buildSessionProjection().messages.length, 1);
+});
+
+for (const role of ['assistant', 'toolResult']) {
+  test(`projection clears inherited ${role} costs without changing content, tokens, or source`, () => {
+    const source = pi.SessionManager.inMemory(home);
+    const message = role === 'assistant' ? assistantMessage() : {
+      role, toolCallId: 'call-1', toolName: 'test',
+      content: [{ type: 'text', text: 'tool finding' }],
+      isError: false, timestamp: 0, usage: billedUsage(),
+    };
+    source.appendMessage(message);
+    const projection = source.buildSessionProjection();
+    const original = structuredClone(projection);
+    const target = pi.SessionManager.inMemory(home);
+    extension.copyProjection(target, projection);
+    const copied = target.buildSessionProjection().messages[0];
+    const zeroCost = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 };
+    assert.deepEqual(copied, { ...message, usage: { ...message.usage, cost: zeroCost } });
+    assert.deepEqual(projection, original);
+    assert.deepEqual(source.buildSessionProjection(), original);
+    assert.notEqual(copied.usage, message.usage);
+    assert.notEqual(copied.usage.cost, message.usage.cost);
+  });
+}
+
+test('projection preserves tool results without usage metadata', () => {
+  const source = pi.SessionManager.inMemory(home);
+  source.appendMessage({
+    role: 'toolResult', toolCallId: 'call-2', toolName: 'test',
+    content: [{ type: 'text', text: 'no billing' }], isError: false, timestamp: 0,
+  });
+  assertProjectionCopy(source);
 });
 
 test('summary input excludes inherited history and survives compaction while honoring edits', () => {

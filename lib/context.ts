@@ -16,6 +16,15 @@ export function copyProjection(sm: SessionManager, projection: SessionProjection
       case "custom":
         sm.appendCustomMessageEntry(message.customType, message.content, message.display, message.details);
         break;
+      case "assistant":
+      case "toolResult":
+        // Inherit context, not the primary's bill. Keep token metadata for context
+        // estimation; copy nested objects so the source session stays untouched.
+        sm.appendMessage(message.usage ? {
+          ...message,
+          usage: { ...message.usage, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+        } : message);
+        break;
       default:
         sm.appendMessage(message);
     }

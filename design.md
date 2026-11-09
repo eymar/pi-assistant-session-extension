@@ -43,6 +43,12 @@ checkpoints, custom messages, and branch findings without resurrecting suppresse
 history. New entries receive local IDs; compaction and branch pointers are rebuilt
 through public append APIs rather than copied as cross-file references.
 
+Copied assistant and tool-result messages have billing costs reset to zero without
+mutating the primary. Content and token metadata remain intact for context
+estimation. New assistant usage counts normally; inherited token counters still
+appear in cumulative totals. Existing session files are not migrated. The separate
+summary-generation request is not currently persisted in session usage totals.
+
 The boundary separates inherited context from the assistant's new exchanges.
 For return summaries, take raw active-branch entries after that boundary, exclude
 compaction entries, rebuild a linear projection with context edits applied, and

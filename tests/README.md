@@ -29,13 +29,19 @@ as extensions.
 
 ## Verification status
 
-- After the modular refactor, all 19 automated tests and strict typechecking against
-  Pi 1.5.0 passed.
+- After the copy-time cost fix, all 23 automated tests and strict typechecking
+  against Pi 1.5.0 passed. Cost regressions cover inherited assistant/tool costs,
+  preserved content/tokens, unchanged primary data, persisted zero costs, and new
+  assistant charges. The footer itself has not yet been verified live.
 - Live round trips, including after the refactor using `-e`, confirmed phrase
   forwarding, session IDs, model attribution, and unavailable-Git coverage warnings.
 - A subsequent round trip recalled the primary fact “42 is the answer.” This is
   consistent with context inheritance after primary compaction, but the session
   file has not been inspected to confirm that compaction actually occurred.
+
+The separate summary-generation request is not currently recorded in session usage
+entries, so its cost is absent from totals. Recording that usage is a separate
+accounting follow-up, not part of the inherited-cost fix.
 
 ## Remaining live checks
 
