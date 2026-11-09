@@ -1,0 +1,19 @@
+{
+  "name": "pi-assistant-session-extension",
+  "version": "0.6.0",
+  "private": true,
+  "type": "module",
+  "pi": {
+    "extensions": ["./assistant-session.ts"]
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "1.5.0",
+    "@types/node": "^24.0.0",
+    "jiti": "^2.6.0",
+    "typescript": "^5.9.0"
+  }
+}
