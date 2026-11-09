@@ -23,14 +23,15 @@ primary file path, provider, and outgoing model ID. Pi session IDs, connection
 identity, retention settings, and primary requests remain untouched. Other
 providers/APIs and requests without a cache key are left alone.
 
-For `gpt-6-luna` only, an experimental explicit breakpoint marks the last eligible
-inherited user `input_text` block before the persisted stint boundary. Input text is
-unchanged and implicit caching remains enabled. Missing/ambiguous boundaries,
-missing eligible text, explicit-only mode, or existing breakpoints skip annotation.
-The annotation changes only the outgoing payload, never stored session history.
-A live three-stint Luna sequence confirmed provider acceptance and substantial
-cross-stint reuse on both warm requests; see the test notes for measurements.
-Cache keys and breakpoints do not guarantee hits under other conditions.
+For GPT-prefixed model IDs whose Pi compatibility metadata sets
+`supportsExplicitPromptCacheMode`, an experimental explicit breakpoint marks the
+last eligible inherited user `input_text` block before the persisted stint boundary.
+Input text is unchanged and implicit caching remains enabled. Missing/ambiguous
+boundaries, missing eligible text, explicit-only mode, or existing breakpoints skip
+annotation. The annotation changes only the outgoing payload, never stored session
+history. A live three-stint Luna sequence confirmed provider acceptance and
+substantial cross-stint reuse on both warm requests; other GPT models remain
+unverified. Cache keys and breakpoints do not guarantee hits under other conditions.
 
 ## Opening an assistant
 

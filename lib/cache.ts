@@ -5,9 +5,13 @@ import { findMarker } from "./state.ts";
 type JsonObject = Record<string, unknown>;
 const object = (value: unknown): value is JsonObject => !!value && typeof value === "object" && !Array.isArray(value);
 
-/** Experimental Luna-only checkpoint in inherited context; never rewrite text. */
+/** Add a checkpoint only for GPT models whose Pi compatibility metadata opts in. */
 function inheritedBreakpoint(request: JsonObject, ctx: ExtensionContext, boundaryId: string | undefined): JsonObject {
-  if (request.model !== "gpt-6-luna" || !Array.isArray(request.input) || !boundaryId) return request;
+  const model = ctx.model;
+  const supportsExplicitCache = model?.api === "openai-responses" &&
+    (model.compat as { supportsExplicitPromptCacheMode?: boolean } | undefined)?.supportsExplicitPromptCacheMode === true;
+  if (typeof request.model !== "string" || !request.model.startsWith("gpt-") || !supportsExplicitCache ||
+      !Array.isArray(request.input) || !boundaryId) return request;
   if (object(request.prompt_cache_options) && request.prompt_cache_options.mode === "explicit") return request;
   const boundary = ctx.sessionManager.getBranch().find((entry) => entry.id === boundaryId);
   if (boundary?.type !== "message" || boundary.message.role !== "user" || typeof boundary.message.content !== "string") return request;

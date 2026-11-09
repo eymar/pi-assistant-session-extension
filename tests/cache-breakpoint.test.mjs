@@ -5,7 +5,7 @@ import { loadModule } from './support/runtime.mjs';
 import { host } from './support/host.mjs';
 const { assistantCachePayload } = await loadModule('lib/cache.ts');
 const { cacheFingerprint } = await loadModule('lib/cache-debug.ts');
-const model = { provider: 'openai', api: 'openai-responses', id: 'gpt-6-luna' };
+const model = { provider: 'openai', api: 'openai-responses', id: 'gpt-6-luna', compat: { supportsExplicitPromptCacheMode: true } };
 const text = (value) => ({ type: 'input_text', text: value });
 const boundaryText = '[test boundary]';
 const entries = [
@@ -28,7 +28,7 @@ function request() {
 const points = (payload) => payload.input.flatMap((item, i) => (item.content ?? [])
   .flatMap((block, j) => block.prompt_cache_breakpoint ? [[i, j]] : []));
 
-test('Luna breakpoint marks only inherited user text, preserving input and implicit retention policy', () => {
+test('compatible GPT breakpoint marks only inherited user text, preserving implicit retention policy', () => {
   const payload = request();
   const original = structuredClone(payload);
   const rewritten = assistantCachePayload(payload, ctx);
@@ -44,11 +44,20 @@ test('Luna breakpoint marks only inherited user text, preserving input and impli
 
 test('unsupported models, absent/ambiguous boundaries, and missing eligible inherited blocks skip annotation', () => {
   const variants = [];
-  variants.push({ ...request(), model: 'gpt-5.4' });
   const absent = request(); absent.input.splice(3, 1); variants.push(absent);
   const ambiguous = request(); ambiguous.input.push({ role: 'user', content: [text(boundaryText)] }); variants.push(ambiguous);
   const noText = request(); noText.input[1].content = [{ type: 'input_image' }]; variants.push(noText);
   for (const payload of variants) assert.deepEqual(points(assistantCachePayload(payload, ctx)), []);
+  for (const id of ['gpt-5.4', 'gpt-6.1-sol', 'gpt-6-luna']) {
+    const compatible = { ...request(), model: id };
+    assert.deepEqual(points(assistantCachePayload(compatible, { ...ctx,
+      model: { ...model, id } })), [[1, 0]], id);
+  }
+  const nonGpt = { ...request(), model: 'o4-mini' };
+  assert.deepEqual(points(assistantCachePayload(nonGpt, { ...ctx, model: { ...model, id: 'o4-mini' } })), []);
+  const unsupported = { ...request(), model: 'gpt-5.5' };
+  assert.deepEqual(points(assistantCachePayload(unsupported, { ...ctx,
+    model: { ...model, id: 'gpt-5.5', compat: { supportsExplicitPromptCacheMode: false } } })), []);
   assert.deepEqual(points(assistantCachePayload(request(), { model, sessionManager: {
     getBranch: () => [entries[1]] } })), []);
 });

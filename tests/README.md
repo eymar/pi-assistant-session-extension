@@ -27,7 +27,7 @@ no provider requests or real credentials are used. Coverage includes:
 - Content-aware Git reporting and unavailable/partial coverage.
 - Source-package and copied-installation loading.
 - Inherited cost removal without changing primary data or token metadata.
-- Stable cache keys, Luna breakpoint placement, unchanged text/retention/session IDs.
+- Stable cache keys, capability-gated GPT breakpoint placement, unchanged text/retention/session IDs.
 - Opt-in fingerprint privacy, prefix comparison, permissions, and failure isolation.
 
 All 37 tests and strict typechecking against installed Pi 1.5.0 passed after the
@@ -43,7 +43,7 @@ tokens. Fingerprints confirmed equal keys/settings and a large shared input pref
 Comparisons against the primary's saved fork leaves found the copied projected
 context and LLM conversion intact, excluding expected metadata differences.
 
-After adding the Luna inherited-context breakpoint, three fresh stints reported:
+After adding the inherited-context breakpoint for GPT-6 Luna, three fresh stints reported:
 
 | Stint | Cache read | Cache write | Recorded cost (USD) |
 | --- | ---: | ---: | ---: |
@@ -81,8 +81,10 @@ payloads are logged; hashes still reveal equality and can permit value guessing.
 
 Logging captures our hook after rewriting, not later handlers or OpenAI's hidden
 rendered context. Sidecars use mode 0600 and refuse symlinks. Failures warn without
-aborting the request. The breakpoint is Luna-only and skips missing/ambiguous
-boundaries, missing eligible text, explicit-only mode, or existing breakpoints.
+aborting the request. Breakpoints apply only to GPT-prefixed native OpenAI
+Responses models whose Pi compatibility metadata enables explicit prompt-cache
+mode. They skip missing/ambiguous boundaries, missing eligible text, explicit-only
+mode, or existing breakpoints. Only Luna has live provider verification.
 
 ## Remaining checks and limitations
 
@@ -95,4 +97,4 @@ boundaries, missing eligible text, explicit-only mode, or existing breakpoints.
   reported compaction succeeded, but the compaction entry was not inspected.
 - Exercise live cancellation and Git reports for already-dirty and committed edits.
 - Test cache reuse after compaction, longer idle gaps, and other prompt/tool changes.
-  Other models have not been validated for the explicit breakpoint.
+  Other GPT models have not been live-validated for the explicit breakpoint.
