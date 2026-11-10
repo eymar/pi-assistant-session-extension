@@ -56,6 +56,9 @@ export async function restoreAssistantModel(pi: ExtensionAPI, ctx: ExtensionCont
   }
 }
 
+/** Stable footer status key owned by this extension. */
+export const STATUS_KEY = "assistant-session";
+
 export function updateAssistantStatus(ctx: ExtensionContext): void {
-  ctx.ui.setStatus("assistant-session", `⚡ ASSISTANT (${modelName(ctx.model)})`);
+  ctx.ui.setStatus(STATUS_KEY, `⚡ ASSISTANT (${modelName(ctx.model)})`);
 }

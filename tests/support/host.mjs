@@ -11,6 +11,7 @@ export async function host() {
   const commands = new Map();
   const handlers = new Map();
   const notifications = [];
+  const statuses = [];
   const choices = [];
   const edits = [];
   const summaries = [];
@@ -29,7 +30,7 @@ export async function host() {
   let cancelSwitch = false;
   let forcePrimaryModel = false;
   let rejectModelActivation = false;
-  const ui = { notify: (message) => notifications.push(message), setStatus() {},
+  const ui = { notify: (message) => notifications.push(message), setStatus: (key, text) => statuses.push([key, text]),
     confirm: async () => choices.shift() ?? false, editor: async () => edits.shift(),
     select: async () => { throw Error('unexpected picker'); } };
   const registry = new pi.ModelRegistry(modelRuntime);
@@ -42,6 +43,7 @@ export async function host() {
       get model() { check(); return session.model; },
       get cwd() { check(); return root; },
       get ui() { check(); return ui; },
+      get hasUI() { check(); return true; },
       get modelRegistry() { check(); return registry; },
       waitForIdle: async () => { check(); },
       sendMessage: async (message) => { check(); await session.sendCustomMessage(message); },
@@ -74,7 +76,7 @@ export async function host() {
   const primaryPath = sm.getSessionFile();
   const primaryBytes = readFileSync(primaryPath, 'utf8');
   return {
-    commands, choices, edits, summaries, notifications, handlers, primaryPath, primaryBytes,
+    commands, choices, edits, summaries, notifications, statuses, handlers, primaryPath, primaryBytes,
     get session() { return current; },
     set cancel(value) { cancelSwitch = value; },
     set forcePrimary(value) { forcePrimaryModel = value; },

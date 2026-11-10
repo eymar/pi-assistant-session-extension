@@ -1,5 +1,6 @@
 import { convertToLlm, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { stintMessages } from "./context.ts";
+import { STATUS_KEY, updateAssistantStatus } from "./models.ts";
 
 export interface ReviewedNote {
   note: string;
@@ -17,6 +18,22 @@ const SUMMARY_INSTRUCTIONS =
   "Do not discuss missing context. File detection is best-effort: mention known file edits if relevant. " +
   "If nothing substantive happened, reply exactly: Nothing substantive.";
 
+/** Ticking footer status while the isolated summary request runs. No-op without a UI. */
+async function withSummaryProgress<T>(ctx: ExtensionCommandContext, work: () => Promise<T>): Promise<T> {
+  if (!ctx.hasUI) return work();
+  const started = Date.now();
+  const update = () => ctx.ui.setStatus(STATUS_KEY,
+    `⚡ ASSISTANT — summarizing stint… ${Math.round((Date.now() - started) / 1000)}s`);
+  update();
+  const timer = setInterval(update, 1000);
+  try {
+    return await work();
+  } finally {
+    clearInterval(timer);
+    updateAssistantStatus(ctx);
+  }
+}
+
 async function reviewSummary(ctx: ExtensionCommandContext, boundaryId: string | undefined): Promise<SummaryReview> {
   const messages = stintMessages(ctx.sessionManager.getBranch(), boundaryId);
   if (!messages) {
@@ -33,11 +50,12 @@ async function reviewSummary(ctx: ExtensionCommandContext, boundaryId: string | 
   }
 
   try {
+    const model = ctx.model;
     // Isolated call: no tools, inherited history, injected turn, or polling race.
-    const response = await ctx.modelRegistry.complete(ctx.model, {
+    const response = await withSummaryProgress(ctx, () => ctx.modelRegistry.complete(model, {
       systemPrompt: SUMMARY_INSTRUCTIONS,
       messages: [{ role: "user", content: JSON.stringify(convertToLlm(messages)), timestamp: Date.now() }],
-    }, { maxTokens: 1024, signal: AbortSignal.timeout(60_000) });
+    }, { maxTokens: 1024, signal: AbortSignal.timeout(60_000) }));
     if (response.stopReason !== "stop") throw new Error(`Summary did not finish normally (${response.stopReason}).`);
     const draft = response.content.filter((block) => block.type === "text").map((block) => block.text).join("\n").trim();
     if (!draft) throw new Error("Summary was empty.");

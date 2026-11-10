@@ -19,19 +19,22 @@ local development dependencies.
 
 ## Automated coverage
 
-The 37 tests use real Pi session managers/SDK sessions and mocked provider responses;
+The 41 tests use real Pi session managers/SDK sessions and mocked provider responses;
 no provider requests or real credentials are used. Coverage includes:
 
 - Context projection, edits/omissions, branch findings, and compaction/stint scope.
-- Model restoration, summary approval/fallback, and cancelled switches.
-- Content-aware Git reporting and unavailable/partial coverage.
+- Model restoration, summary approval/fallback, cancelled switches, and summary
+  progress indication (ticking footer status, restored assistant status).
+- Content-aware Git reporting and unavailable/partial coverage, including clean
+  sentinels, legacy full-hash snapshots, format-mismatch handling, and
+  dirty-to-committed transitions.
 - Source-package and copied-installation loading.
 - Inherited cost removal without changing primary data or token metadata.
 - Stable cache keys, capability-gated GPT breakpoint placement, unchanged text/retention/session IDs.
 - Opt-in fingerprint privacy, prefix comparison, permissions, and failure isolation.
 
-All 37 tests and strict typechecking against installed Pi 1.5.0 passed after the
-breakpoint implementation. These automated checks do not prove provider cache hits.
+All 41 tests and strict typechecking against installed Pi 1.5.0 passed after the
+summary progress indicator implementation. These automated checks do not prove provider cache hits.
 
 ## Live verification
 

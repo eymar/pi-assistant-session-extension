@@ -81,6 +81,21 @@ test('reviewed summary is scoped, tool-free, attributed, and appended after retu
   } finally { h.close(); }
 });
 
+test('summary generation shows ticking footer progress and restores the assistant status', async () => {
+  const h = await host();
+  try {
+    await h.run('assistant');
+    h.session.sessionManager.appendMessage(user('stint finding'));
+    h.choices.push(true);
+    h.edits.push('approved');
+    h.statuses.length = 0;
+    await h.run('primary');
+    const texts = h.statuses.map(([, text]) => text ?? '');
+    assert.ok(texts.some((text) => /summarizing stint… 0s/.test(text)), 'progress status shown');
+    assert.match(texts.at(-1), /^\u26a1 ASSISTANT \(/, 'assistant status restored last');
+  } finally { h.close(); }
+});
+
 test('cancelled return writes no flow-back; retry appends exactly once', async () => {
   const h = await host();
   try {

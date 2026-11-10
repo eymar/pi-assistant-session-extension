@@ -82,7 +82,10 @@ fact: an assistant reply can legitimately repeat inherited primary information.
 1. Wait for idle; find the assistant marker and check that the primary file exists.
 2. Offer a tool-free summary through `ctx.modelRegistry.complete()` on the current
    selected model. Supply only the projected stint transcript as serialized data,
-   with a 60-second timeout and a 1,024-token output limit.
+   with a 60-second timeout and a 1,024-token output limit. While the request
+   runs, the extension's footer status slot shows a ticking elapsed-time
+   indicator ("summarizing stint…"); the persistent assistant-mode status is
+   restored afterwards, and UI-less modes skip the indicator.
 3. Require a normally finished, non-empty response. An exact `Nothing substantive.`
    response skips the note; other drafts open in an editor for approval or editing.
    Declining, discarding, or failing generation allows a manual note instead.
@@ -101,15 +104,30 @@ extension-supplied, not authenticated inter-model messaging.
 ## File-change reporting
 
 Compare start/end fingerprints for tracked and non-ignored untracked repository
-files: SHA-256 contents plus executable bits for regular files, targets for symlinks.
-This detects net additions, deletions, and modifications, including already-dirty
-files and edits committed during the stint. It does not assign authorship.
+files: SHA-256 contents plus executable bits for regular files, targets for
+symlinks. Snapshots are version 2. Tracked files from `git ls-files` are seeded
+as clean sentinels; `git status --porcelain -z` — backed by the index stat
+cache, so it never reads unchanged file contents — selects the only paths worth
+hashing: dirty and non-ignored untracked files. Candidates are hashed with
+bounded concurrency instead of one stream at a time, so the end snapshot costs
+work proportional to changed files, not repository size.
+
+Comparison semantics are unchanged: sentinel-versus-hash inequality still reports
+modifications (including already-dirty files reverted to committed content
+during the stint), absent keys still report additions and deletions, and this
+still detects net changes for edits committed during the stint without assigning
+authorship. New caveats: changes invisible to Git status (assume-unchanged or
+skip-worktree entries, executable-bit-only changes where `core.fileMode` is
+false) may be missed. Markers predating version 2 hold full-hash snapshots;
+returns from those sessions re-hash everything in the legacy format for a
+comparable baseline, and mixed formats report detection unavailable rather than
+spurious mass modification.
 
 Ignored files, Git metadata, submodule contents, outside-repository paths, and
 transient/reverted changes are excluded. Inspection errors produce warnings;
 missing or incompatible Git baselines explicitly report unavailable detection,
 never a clean bill of health. Mutating tools remain enabled, so the primary should
-re-read relevant files. Hashing large repositories can be expensive.
+re-read relevant files.
 
 ## Persistence and lifecycle
 

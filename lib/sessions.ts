@@ -21,7 +21,10 @@ export async function returnToPrimary(ctx: ExtensionCommandContext): Promise<voi
   const { note, summaryModel } = await collectReviewedNote(ctx, marker.boundaryId);
   // Snapshot last, after summary/review. Unavailable reporting is never silently
   // interpreted as no edits. Always pass the coverage information to the primary.
-  const report = fileChangeReport(marker.files, await snapshotFiles(ctx.cwd));
+  // Markers from before versioned snapshots lack a version; hash everything for a
+  // comparable legacy baseline instead of reporting a spurious mass modification.
+  const legacy = marker.files !== undefined && marker.files.version === undefined;
+  const report = fileChangeReport(marker.files, await snapshotFiles(ctx.cwd, { legacy }));
   const source = {
     assistantSessionId: ctx.sessionManager.getSessionId(),
     assistantSessionFile: ctx.sessionManager.getSessionFile(),

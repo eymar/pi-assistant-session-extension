@@ -47,6 +47,40 @@ test('hash snapshots detect additions, deletion, and executable-bit changes', as
   assert.match(report.text, /deleted: "tracked.txt"/);
 });
 
+test('git-status snapshots record clean sentinels and match legacy full-hash comparisons', async () => {
+  const root = repo();
+  const before = await extension.snapshotFiles(root);
+  assert.equal(before.version, 2);
+  assert.equal(before.files['tracked.txt'], 'clean');
+  assert.equal(before.files['.gitignore'], 'clean');
+  // No change between snapshots: nothing to report, as with full hashing.
+  assert.deepEqual(extension.fileChangeReport(before, await extension.snapshotFiles(root)).changed, []);
+  // Legacy snapshots (no version) still work when both sides use the legacy path.
+  const legacy = await extension.snapshotFiles(root, { legacy: true });
+  assert.equal(legacy.version, undefined);
+  assert.match(legacy.files['tracked.txt'], /^file:/);
+  assert.deepEqual(extension.fileChangeReport(legacy, await extension.snapshotFiles(root, { legacy: true })).changed, []);
+});
+
+test('a change reverted to the committed state reports as modified, not clean', async () => {
+  const root = repo();
+  writeFileSync(join(root, 'tracked.txt'), 'already dirty\n');
+  const before = await extension.snapshotFiles(root);
+  // Assistant reverts the file to its committed content during the stint.
+  writeFileSync(join(root, 'tracked.txt'), 'base\n');
+  const report = extension.fileChangeReport(before, await extension.snapshotFiles(root));
+  assert.deepEqual(report.changed, ['tracked.txt']);
+  assert.match(report.text, /modified: "tracked.txt"/);
+});
+
+test('mixed snapshot formats report unavailable instead of spurious changes', async () => {
+  const root = repo();
+  const legacy = await extension.snapshotFiles(root, { legacy: true });
+  const current = await extension.snapshotFiles(root);
+  assert.match(extension.fileChangeReport(legacy, current).text, /snapshot formats differ/);
+  assert.deepEqual(extension.fileChangeReport(legacy, current).changed, []);
+});
+
 test('outside Git and legacy baselines explicitly report unavailable coverage', async () => {
   const snapshot = await extension.snapshotFiles(temporary());
   assert.match(extension.fileChangeReport(snapshot, snapshot).text, /unavailable/);
