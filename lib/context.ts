@@ -1,44 +1,85 @@
-import { buildSessionProjection, type SessionEntry, type SessionManager, type SessionProjection } from "@earendil-works/pi-coding-agent";
+import {
+  buildSessionProjection,
+  type SessionEntry,
+  type SessionManager,
+  type SessionProjection,
+} from "@earendil-works/pi-coding-agent";
 
-/** Copy only effective projected messages, never raw edited/omitted entries. */
-export function copyProjection(sm: SessionManager, projection: SessionProjection): void {
+type ProjectedMessage = SessionProjection["messages"][number];
+
+const ZERO_COST = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 };
+
+/** Reset dollar costs to zero while keeping token counts for context-window estimation. */
+function withZeroCost<T extends { usage?: { cost?: unknown } }>(message: T): T {
+  if (!message.usage) return message;
+  return {
+    ...message,
+    usage: { ...message.usage, cost: { ...ZERO_COST } },
+  };
+}
+
+/**
+ * Copy the primary session's effective projected messages into a new assistant session.
+ * Using the projection (rather than raw entries) preserves user context edits and omissions.
+ */
+export function copyProjection(target: SessionManager, projection: SessionProjection): void {
   for (const message of projection.messages) {
     switch (message.role) {
       case "compactionSummary":
-        // A projected system checkpoint immediately precedes this summary.
-        // appendCompaction captures it before replacing the preceding context.
-        sm.appendCompaction(message.summary, null, message.tokensBefore);
+        // A system checkpoint precedes this summary in the projection; appendCompaction captures it.
+        target.appendCompaction(message.summary, null, message.tokensBefore);
         break;
+
       case "branchSummary":
-        // Preserve the finding, but use only local tree pointers in the copy.
-        sm.branchWithSummary(sm.getLeafId(), message.summary);
+        // Keep the branch summary text, linked to the local leaf in the new session.
+        target.branchWithSummary(target.getLeafId(), message.summary);
         break;
+
       case "custom":
-        sm.appendCustomMessageEntry(message.customType, message.content, message.display, message.details);
+        target.appendCustomMessageEntry(
+          message.customType,
+          message.content,
+          message.display,
+          message.details,
+        );
         break;
+
       case "assistant":
       case "toolResult":
-        // Inherit context, not the primary's bill. Keep token metadata for context
-        // estimation; copy nested objects so the source session stays untouched.
-        sm.appendMessage(message.usage ? {
-          ...message,
-          usage: { ...message.usage, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
-        } : message);
+        // Do not carry the primary session's billing cost into the assistant session.
+        target.appendMessage(withZeroCost(message));
         break;
+
       default:
-        sm.appendMessage(message);
+        target.appendMessage(message);
     }
   }
 }
 
-/** Re-project the active stint, without inherited history or mixed compaction summaries.
- * Raw active-branch entries survive compaction, so this also retains earlier stint
- * messages after the visible boundary has been compacted out of model context.
+/**
+ * Return projected messages from the assistant stint only (everything after boundaryId).
+ * Compaction entries are removed so raw stint messages remain available even after compaction,
+ * and mixed primary/assistant compaction summaries are never sent to the summarizer.
  */
-export function stintMessages(branch: SessionEntry[], boundaryId: string | undefined) {
-  const index = boundaryId ? branch.findIndex((entry) => entry.id === boundaryId) : -1;
-  if (index < 0) return undefined;
-  const entries = branch.slice(index + 1).filter((entry) => entry.type !== "compaction");
-  const linear = entries.map((entry, i) => ({ ...entry, parentId: i ? entries[i - 1].id : null }));
-  return buildSessionProjection(linear).messages.filter((message) => message.role !== "system");
+export function stintMessages(
+  branch: SessionEntry[],
+  boundaryId: string | undefined,
+): ProjectedMessage[] | undefined {
+  if (!boundaryId) return undefined;
+
+  const boundaryIndex = branch.findIndex((entry) => entry.id === boundaryId);
+  if (boundaryIndex < 0) return undefined;
+
+  const stintEntries = branch
+    .slice(boundaryIndex + 1)
+    .filter((entry) => entry.type !== "compaction");
+
+  const linearEntries = stintEntries.map((entry, index) => ({
+    ...entry,
+    parentId: index > 0 ? stintEntries[index - 1].id : null,
+  }));
+
+  return buildSessionProjection(linearEntries).messages.filter(
+    (message) => message.role !== "system",
+  );
 }
